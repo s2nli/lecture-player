@@ -206,6 +206,11 @@ const fmt=t=>{if(!isFinite(t))return'0:00';t=Math.max(0,t|0);const h=t/3600|0,m=
 const sec=v=>typeof v==='number'?v:String(v).split(':').reduce((a,b)=>a*60+ +b,0);
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const SPEEDS=Array.from({length:56},(_,i)=>(i+5)/10),QORDER=['auto','360p','480p','720p','1080p'];
+const LOC=/^https?:$/.test(location.protocol),PX=u=>'api/dl?k=3005temp&u='+encodeURIComponent(u);
+const normUrl=u=>{u=String(u||'').trim();if(/^blob:/i.test(u))return u;const m=u.match(/https?:\/\/[^\s"'<>]+/i);if(m)u=m[0];try{const x=new URL(u),h=x.hostname.replace(/^www\./,'');
+if(h==='drive.google.com'||h==='docs.google.com'){const id=(x.pathname.match(/\/d\/([\w-]{10,})/)||[])[1]||x.searchParams.get('id');if(id)return 'https://drive.usercontent.google.com/download?id='+id+'&export=download&confirm=t'}
+if(h==='dropbox.com'){x.searchParams.delete('dl');x.searchParams.set('raw','1');return x.href}}catch{}return u};
+const mediaKind=u=>{if(/^blob:/i.test(u))return /#\.m3u8$/i.test(u)?'hls':'file';const b=u.split(/[?#]/)[0].toLowerCase();if(/\.m3u8?$/.test(b)||/m3u8/i.test(u))return 'hls';if(/\.mpd$/.test(b))return 'dash';if(/\.(mp4|m4v|webm|mov|mkv|ogv|ogg|oga|mp3|m4a|aac|wav|flac|opus|3gp)$/.test(b))return 'file';return '?'};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ytId=u=>{try{if(!/^[\w+.-]+:/.test(u))u='https://'+u;const x=new URL(u),h=x.hostname.replace(/^(www|m|music)\./,''),ok=i=>/^[\w-]{11}$/.test(i||'')?i:null;if(h==='youtu.be')return ok(x.pathname.slice(1,12));if(h==='youtube.com'||h==='youtube-nocookie.com'){const m=x.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/);return m?m[1]:x.pathname==='/watch'?ok(x.searchParams.get('v')):null}}catch{}return null};
 const ytq=[];const ytLoad=()=>{if(ytLoad.d)return;ytLoad.d=1;const e=document.createElement('script');e.src='https://www.youtube.com/iframe_api';e.onerror=()=>{ytLoad.d=0;ytq.splice(0).forEach(f=>f(1))};document.head.appendChild(e);window.onYouTubeIframeAPIReady=()=>ytq.splice(0).forEach(f=>f())};
@@ -265,7 +270,7 @@ v.addEventListener('timeupdate',()=>{if(!this.yt&&v.readyState>=3&&!v.seeking)th
 v.addEventListener('progress',()=>this.draw());v.addEventListener('durationchange',()=>this.draw());
 v.addEventListener('volumechange',()=>{this.icons();if(this.vhOk)this.volHud()});v.addEventListener('playing',()=>{this.vhOk=true});document.addEventListener('keydown',e=>{if(current!==this)return;if(e.key==='AudioVolumeUp'||e.key==='VolumeUp'||e.keyCode===175){v.volume=Math.min(1,v.volume+.1);v.muted=false;ls.set('lp:vol',v.volume)}else if(e.key==='AudioVolumeDown'||e.key==='VolumeDown'||e.keyCode===174){v.volume=Math.max(0,v.volume-.1);ls.set('lp:vol',v.volume)}else if(e.key==='AudioVolumeMute'||e.keyCode===173){v.muted=!v.muted}});v.addEventListener('ratechange',()=>this.labels());
 v.addEventListener('loadedmetadata',()=>this.ready());
-v.addEventListener('error',()=>{if(this.hls)return;const o=this.src0;if(o&&!this.px&&!this.yt&&/^https?:/i.test(location.protocol)&&/^https?:\/\//i.test(o)&&!/\.m3u8(\?|$)/i.test(o)){this.px=1;v.src='api/dl?k=3005temp&u='+encodeURIComponent(o);v.load();return}this.err()});
+v.addEventListener('error',()=>{if(this.hls||this.dash||this.yt)return;const o=this.src0;if(o&&!this.px&&LOC&&/^https?:\/\//i.test(o)){this.px=1;const ct=v.currentTime||0;if(ct>1)this.pend={t:ct,play:true};v.src=PX(o);v.load();return}this.err()});
 v.addEventListener('ended',()=>{this.show();ls.set('lp:pos:'+this.id,0);if(this.sl==='end')return this.sleepEnd();const n=this.d.nextLecture;if(n)this.toast('Up next: '+(n.title||'next lecture'),[['Play',()=>this.nav('nextLecture')]],8000)});
 document.addEventListener('fullscreenchange',()=>{this.icons();this.show()});
 addEventListener('resize',()=>this.show());addEventListener('orientationchange',()=>setTimeout(()=>this.show(),250));
@@ -291,13 +296,21 @@ this.v.volume=this.vol;this.vsl.value=this.vol;
 this.saved=ls.get('lp:pos:'+this.id,0);this.offer=true;
 this.setSrc(this.urlFor(this.cq),0,!!d.autoplay);this.v.playbackRate=this.speed;this.labels();this.icons();this.draw();this.show()}
 urlFor(k){return this.d.quality[k]||(this.hasMap&&this.d.quality[this.mapKey(k)])||this.d.videoUrl}
-setSrc(url,t,play){const v=this.v;this.src0=url;this.px=0;this.hls?.destroy();this.hls=null;this.pend={t,play};this.busy(1);this.r.classList.remove('failed');this.ytOff();const yi=ytId(url);if(yi){try{v.pause();v.removeAttribute('src');v.load()}catch{}return this.ytOn(yi)}
-if(/\.m3u8(\?|$)/i.test(url)&&!v.canPlayType('application/vnd.apple.mpegurl')){
-if(window.Hls&&Hls.isSupported()){const h=this.hls=new Hls({maxBufferLength:30,startLevel:-1,subtitleDisplay:!!this.cc});h.loadSource(url);h.attachMedia(v);
+setSrc(url,t,play){const v=this.v;url=normUrl(url);this.src0=url;this.px=0;this.retried=0;this.hls?.destroy();this.hls=null;try{this.dash?.reset()}catch{}this.dash=null;this.pend={t,play};this.busy(1);this.r.classList.remove('failed');this.ytOff();const yi=ytId(url);if(yi){try{v.pause();v.removeAttribute('src');v.load()}catch{}return this.ytOn(yi)}
+const tok=this.tok=(this.tok||0)+1;this.go(url,tok)}
+async go(url,tok){const v=this.v;let kind=mediaKind(url);if(kind==='?')kind=await this.sniff(url);if(tok!==this.tok)return;
+const web=/^https?:\/\//i.test(url),mixed=web&&LOC&&location.protocol==='https:'&&/^http:\/\//i.test(url);if(mixed)this.px=1;const src=mixed?PX(url):url;
+if(kind==='hls')return this.hlsPlay(url,src);if(kind==='dash')return this.dashPlay(src);v.src=src;v.load()}
+async sniff(url){if(!LOC||!/^https?:\/\//i.test(url))return 'file';const ac=new AbortController(),to=setTimeout(()=>ac.abort(),7000);try{const r=await fetch(PX(url),{headers:{Range:'bytes=0-2047'},signal:ac.signal});const ct=r.headers.get('content-type')||'';
+if(/mpegurl/i.test(ct))return 'hls';if(/dash\+xml/i.test(ct))return 'dash';if(/^(video|audio)\//i.test(ct))return 'file';const rd=r.body.getReader(),{value}=await rd.read();rd.cancel().catch(()=>{});const tx=new TextDecoder().decode((value||new Uint8Array()).slice(0,2048));
+if(/^\s*#EXTM3U/.test(tx))return 'hls';if(/<MPD[\s>]/.test(tx))return 'dash'}catch{}finally{clearTimeout(to)}return 'file'}
+hlsPlay(url,src){const v=this.v,web=/^https?:\/\//i.test(url);if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=src;v.load();return}
+if(!(window.Hls&&Hls.isSupported()))return this.err('This browser can\'t play HLS streams.');
+const start=(s,viaPx)=>{const h=this.hls=new Hls({maxBufferLength:30,startLevel:-1,subtitleDisplay:!!this.cc});h.loadSource(s);h.attachMedia(v);
 h.on(Hls.Events.MANIFEST_PARSED,()=>{this.lv=[...new Set(h.levels.map(l=>l.height).filter(Boolean))].sort((a,b)=>a-b);this.applyQ()});
-h.on(Hls.Events.ERROR,(_,x)=>{if(!x.fatal)return;if(x.type===Hls.ErrorTypes.NETWORK_ERROR&&!this.retried){this.retried=1;h.startLoad()}else if(x.type===Hls.ErrorTypes.MEDIA_ERROR&&this.retried<2){this.retried=2;h.recoverMediaError()}else this.err()})}
-else return this.err('This browser can\'t play HLS streams.')}
-else{v.src=url;v.load()}}
+h.on(Hls.Events.ERROR,(_,x)=>{if(!x.fatal)return;if(x.type===Hls.ErrorTypes.NETWORK_ERROR){if(!viaPx&&web&&LOC){const ct=v.currentTime||0;h.destroy();this.px=1;if(ct>1)this.pend={t:ct,play:true};return start(PX(url),1)}if(!this.retried){this.retried=1;h.startLoad();return}}
+else if(x.type===Hls.ErrorTypes.MEDIA_ERROR&&this.retried<2){this.retried=2;h.recoverMediaError();return}this.err()})};start(src,this.px?1:0)}
+dashPlay(src){const v=this.v,go=()=>{try{const d=this.dash=dashjs.MediaPlayer().create();d.on('error',()=>this.err());d.initialize(v,src,false)}catch{this.err()}};if(window.dashjs)return go();const e=document.createElement('script');e.src='https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.7.4/dash.all.min.js';e.onload=go;e.onerror=()=>this.err('Couldn\'t load the DASH player.');document.head.appendChild(e)}
 ytOff(){if(this.ytKill){this.ytKill();this.ytKill=null}}
 ytOn(id){const v=this.v,self=this,ev=n=>v.dispatchEvent(new Event(n)),DF=(k,g,st)=>Object.defineProperty(v,k,{configurable:true,get:g,set:st}),FN=(k,fn)=>Object.defineProperty(v,k,{configurable:true,value:fn}),cl=x=>Math.min(2,Math.max(.25,x));
 let y,rd=0,pa=true,yv=v.volume,ym=v.muted,yr=this.speed,ct=0,sk=0,ld=0,tm,to;
@@ -323,7 +336,7 @@ to=setTimeout(()=>{if(!rd&&self.yw===w)yerr('YouTube is taking too long to load.
 ready(){const v=this.v,p=this.pend||{};if(p.t)v.currentTime=p.t;if(p.play)v.play().catch(()=>{});this.pend=null;this.draw();
 if(this.offer){this.offer=false;const s=this.saved;if(s>10&&s<v.duration-15)this.toast('Continue from '+fmt(s),[['Start over',()=>{v.currentTime=0},1],['Continue',()=>{v.currentTime=s;v.play().catch(()=>{})}]],9000)}}
 retry(){const v=this.v,t=v.currentTime||this.saved||0;this.retried=0;this.setSrc(this.urlFor(this.cq),t,true)}
-err(m){this.busy(0);this.r.classList.add('failed');this.q('.lp-ext').hidden=true;this.q('.lp-err p').textContent=m||'This lecture couldn\'t be played.'}
+err(m){this.busy(0);this.r.classList.add('failed');const a=this.q('.lp-ext');if(!this.yt&&this.src0&&/^https?:\/\//i.test(this.src0)){a.href=this.src0;a.textContent='Open link';a.hidden=false}else{a.hidden=true;a.textContent='Open in YouTube'}this.q('.lp-err p').textContent=m||'Couldn\'t play this link. It may have expired, be blocked by the server, or use an unsupported format.'}
 busy(b){this.r.classList.toggle('busy',!!b)}
 /* actions */
 toggle(){this.v.paused?this.v.play().catch(()=>{}):this.v.pause()}
@@ -477,7 +490,8 @@ previousLecture:null,nextLecture:{id:'demo-2',title:'Friction and Inclined Plane
 window.player=new LecturePlayer(document.getElementById('player'),lecture,{
 onDownload:d=>DL.start(d),onNavigate:(n)=>player.toast('Host app would open: '+n.title),
 onSelectLecture:(l)=>player.toast('Host app would open: '+l.title)});
-document.querySelector('.lp-url').addEventListener('submit',e=>{e.preventDefault();let u=e.target.elements.u.value.trim();if(!u)return;if(!/^https?:\/\//i.test(u))u='https://'+u;const y=ytId(u);player.load({id:'link:'+u,title:y?'YouTube video':u.split('?')[0].split('/').pop()||u,videoUrl:u,autoTitle:!!y,autoplay:true})});
+document.querySelector('.lp-url').addEventListener('submit',e=>{e.preventDefault();let u=e.target.elements.u.value.trim();if(!u)return;const mm=u.match(/https?:\/\/[^\s"'<>]+/i);if(mm)u=mm[0];else if(!/^[\w+.-]+:\/\//.test(u))u='https://'+u;const y=ytId(u);player.load({id:'link:'+u,title:y?'YouTube video':u.split('?')[0].split('/').pop()||u,videoUrl:u,autoTitle:!!y,autoplay:true})});
+const q0=new URLSearchParams(location.search),lk=q0.get('u')||q0.get('url');if(lk){const y=ytId(lk);player.load({id:'link:'+lk,title:q0.get('t')||(y?'YouTube video':lk.split('?')[0].split('/').pop()||lk),videoUrl:lk,autoTitle:!y?false:true,autoplay:true})}
 })();
 </script><script>
 (()=>{const b=document.getElementById('installBtn'),t=b.querySelector('span'),help=document.getElementById('iosHelp');let dp=null;
