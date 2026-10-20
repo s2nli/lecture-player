@@ -223,7 +223,7 @@ build(){const r=this.r;r.classList.add('lp');r.tabIndex=0;
 r.innerHTML=`<video playsinline webkit-playsinline preload="metadata"></video><div class="lp-tap"></div><button class="lp-cen" data-a="play" aria-label="Play or pause"></button>
 <div class="lp-fx l">−10s</div><div class="lp-fx r">+10s</div><div class="lp-spin"></div><div class="lp-aud"><p>Audio Mode</p><small>Audio only. Tap to show controls.</small></div><div class="lp-hud"></div>
 <div class="lp-err"><p>This lecture couldn't be played.</p><button data-a="retry">Try again</button><a class="lp-ext" target="_blank" rel="noopener" hidden>Open in YouTube</a></div>
-<div class="lp-top"><button data-a="back" aria-label="Back">${ic('back')}</button><h2 class="lp-title"></h2><button data-a="more" aria-label="More options">${ic('more')}</button></div>
+<div class="lp-top"><button data-a="back" aria-label="Back">${ic('back')}</button><h2 class="lp-title"></h2><button data-a="dl" aria-label="Download">${ic('dl')}</button><button data-a="more" aria-label="More options">${ic('more')}</button></div>
 <div class="lp-side"><button data-a="lock" aria-label="Lock controls">${ic('unlock')}</button><button data-a="side" aria-label="Toggle sidebar" hidden>${ic('side')}</button></div>
 <div class="lp-bot"><div class="lp-prog"><div class="lp-times"><span class="lp-cur">0:00</span><span class="lp-dur">0:00</span></div><div class="lp-bar"><div class="lp-track"><div class="lp-buf"></div><div class="lp-fill"></div></div><div class="lp-thumb"></div><div class="lp-tip">0:00</div></div></div>
 <div class="lp-ctl"><button data-a="play" aria-label="Play">${ic('play')}</button><button data-a="back10" aria-label="Back 10 seconds">${ic('b10')}</button><button data-a="fwd10" aria-label="Forward 10 seconds">${ic('f10')}</button><button data-a="prev" aria-label="Previous lecture">${ic('prev')}</button><button data-a="next" aria-label="Next lecture">${ic('next')}</button>
@@ -291,7 +291,7 @@ if(h){e.preventDefault();this.show()}}
 load(d){this.save();this.d=Object.assign({quality:{},attachments:[],chapters:[],lectures:[],previousLecture:null,nextLecture:null,downloadUrl:null},d);d=this.d;this.id=d.id||d.videoUrl;this.r.classList.remove('failed');this.closeAll();this.lv=[];this.retried=0;this.setZoom(1,0,0,0);
 this.title.textContent=d.title||'';this.v.poster=d.poster||'';this.dur.textContent=typeof d.duration==='string'?d.duration:'0:00';
 this.qs=QORDER.filter(k=>k==='auto'||d.quality[k]);this.hasMap=this.qs.length>1;this.cq=QORDER.includes(this.qSel)?this.qSel:'auto';
-this.q('[data-a=prev]').disabled=!d.previousLecture;this.q('[data-a=next]').disabled=!d.nextLecture;this.q('[data-a=tl]').hidden=!d.chapters.length;this.q('[data-a=lec]').hidden=!(d.course?.subjects?.length||d.lectures.length);this.q('[data-a=more]').dataset.empty=d.attachments.length||d.downloadUrl||this.o.onDownload?'':'1';
+this.q('.lp-top [data-a=dl]').style.display=(d.downloadUrl||this.o.onDownload)&&!d.offline?'':'none';this.q('[data-a=prev]').disabled=!d.previousLecture;this.q('[data-a=next]').disabled=!d.nextLecture;this.q('[data-a=tl]').hidden=!d.chapters.length;this.q('[data-a=lec]').hidden=!(d.course?.subjects?.length||d.lectures.length);this.q('[data-a=more]').dataset.empty=d.attachments.length||d.downloadUrl||this.o.onDownload?'':'1';
 this.v.volume=this.vol;this.vsl.value=this.vol;
 this.saved=ls.get('lp:pos:'+this.id,0);this.offer=true;
 this.setSrc(this.urlFor(this.cq),0,!!d.autoplay);this.v.playbackRate=this.speed;this.labels();this.icons();this.draw();this.show()}
@@ -385,7 +385,7 @@ const O={sp:SPEEDS.map(x=>[x,x+'x',x===this.speed]),q:this.qualityOpts().map(k=>
 const st=m.querySelector('.lp-opt')?m.scrollTop:null;
 m.innerHTML=`<button class="lp-row back" data-s="">${ic('back')}<span>${T[s]}</span></button>${O[s].map(o=>`<button class="lp-opt ${o[2]?'on':''}" data-o="${o[0]}"><span>${o[1]}</span><i class="rd"></i></button>`).join('')}`;
 if(st!=null)m.scrollTop=st;else{const on=m.querySelector('.lp-opt.on');m.scrollTop=on?on.offsetTop-m.clientHeight/2+27:0}}
-renderMore(){const d=this.d,dl=d.downloadUrl||this.o.onDownload,R=(a,i,l)=>`<button class="lp-row" data-a="${a}">${ic(i)}${l}</button>`;this.m.more.innerHTML=(d.chapters.length?R('tl','tl','Timeline'):'')+(d.attachments.length?R('att','att','Attachments'):'')+R('pip','pip','Picture in picture')+(dl?R('dl','dl','Download'):'')}
+renderMore(){const d=this.d,dl=d.downloadUrl||this.o.onDownload,R=(a,i,l)=>`<button class="lp-row" data-a="${a}">${ic(i)}${l}</button>`;this.m.more.innerHTML=(d.chapters.length?R('tl','tl','Timeline'):'')+(d.attachments.length?R('att','att','Attachments'):'')+R('pip','pip','Picture in picture')}
 openPanel(k){const d=this.d,P=this.panel;let h='',t='';
 if(k==='tl'){t='Timeline';h=d.chapters.length?d.chapters.map((c,i)=>`<button class="lp-item" data-t="${sec(c.time??c.start)}" data-i="${i}"><b>${fmt(sec(c.time??c.start))}</b><span>${esc(c.title)}</span></button>`).join(''):'<div class="lp-empty">No timeline for this lecture.</div>'}
 if(k==='att'){t='Attachments';h=d.attachments.length?d.attachments.map(a=>`<a class="lp-item" href="${esc(a.url)}" target="_blank" rel="noopener">${ic('att')}<span>${esc(a.title||a.name||'Attachment')}${a.size?`<small>${esc(a.size)}</small>`:''}</span></a>`).join(''):'<div class="lp-empty">No attachments for this lecture.</div>'}
@@ -419,7 +419,7 @@ async function render(){badge.style.display=act.size?'block':'none';badge.textCo
 let ms=[];try{ms=(await all()).sort((a,b)=>b.date-a.date)}catch{}
 const a=[...act].map(([id,x])=>`<div class="dl-it"><h4>${esc(x.title)}</h4><small>Downloading… ${Math.round(x.pct*100)}%${x.size?' · '+sz(x.size):''}</small><div class="dl-pg"><u style="width:${Math.round(x.pct*100)}%"></u></div><div class="dl-row"><button data-cancel="${esc(id)}">Cancel</button></div></div>`).join('');
 const d=ms.filter(m=>!act.has(m.id)).map(m=>`<div class="dl-it"><h4>${esc(m.title)}</h4><small>${sz(m.size)} · ${new Date(m.date).toLocaleDateString()}</small><div class="dl-row"><button class="p" data-play="${esc(m.id)}">Play</button><button class="d" data-del="${esc(m.id)}">Delete</button></div></div>`).join('');
-list.innerHTML=a+d||'<div class="dl-empty">Abhi koi download nahi hai.<br>Player ke ⋮ menu me <b>Download</b> dabao.</div>'}
+list.innerHTML=a+d||'<div class="dl-empty">Abhi koi download nahi hai.<br>Player ke upar ⬇ <b>Download</b> button dabao.</div>'}
 const close=()=>sheet.classList.remove('open');
 document.getElementById('dlBtn').onclick=()=>{sheet.classList.add('open');render()};
 sheet.addEventListener('click',async e=>{if(e.target===sheet||e.target.closest('[data-x]'))return close();const b=e.target.closest('button');if(!b)return;
